@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import subprocess
 
 import requests
@@ -67,8 +68,15 @@ def download_and_check(assembly, outdir):
     md5checksums = parse_md5checksums_lines(md5checksums_lines)
 
     md5checksums_failed = []
+    assembly_accession = assembly['assembly_accession']
+    assembly_name = assembly['asm_name']
+    chars_to_replace_with_underscores = [' ', '(', ')', '/']
+    for c in chars_to_replace_with_underscores:
+        assembly_name = assembly_name.replace(c, '_')
+    if '__' in assembly_name:
+        assembly_name = re.sub('_+', '_', assembly_name)
     for suffix in file_suffixes:
-        filename = '_'.join([assembly['assembly_accession'], assembly['asm_name'], suffix])
+        filename = '_'.join([assembly_accession, assembly_name, suffix])
         url = os.path.join(ftp_path, filename)
         r = requests.get(url, allow_redirects=True)
         if filename.endswith('.gz'):
@@ -93,7 +101,7 @@ def download_and_check(assembly, outdir):
             gzip_file,
         ]
         subprocess.run(gunzip_cmd, capture_output=True, check=True)
-    logging.info(json.dumps({"event_type": "download_complete", "assembly_accession": assembly['assembly_accession'], "num_md5_checksums_failed": len(md5checksums_failed)}))
+    logging.info(json.dumps({"event_type": "download_complete", "assembly_accession": assembly_accession, "num_md5_checksums_failed": len(md5checksums_failed)}))
 
 
 def main(args):
@@ -140,7 +148,9 @@ def main(args):
 
 
     for assembly in assembly_summary_filtered:
-        download_and_check(assembly, args.outdir)
+        assembly_accession = assembly['assembly_accession']
+        if not(os.path.exists(os.path.join(args.outdir, assembly_accession))):
+            download_and_check(assembly, args.outdir)
     
     
 
